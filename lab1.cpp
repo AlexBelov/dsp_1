@@ -2,6 +2,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <iostream>
 #include <cmath>
+#include <set>
 
 using namespace cv;
 using namespace std;
@@ -401,6 +402,11 @@ int main(int argc, char** argv)
 
   int* labels = (int*)calloc(width*height,sizeof(int));
   recursiveLabeling(image, labels);
+
+  std::set<int> slabels(labels, labels + width*height);
+  int contour_num = slabels.size() - 1;
+  cout << "Contours number: " << contour_num << endl;
+  
   image = colorizeContours(image, labels);
 
   imwrite(new_image_path, image);
