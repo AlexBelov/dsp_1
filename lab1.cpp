@@ -380,6 +380,124 @@ void normalizeLabels(int* labels, int* contours, int labels_size, int contours_s
   }
 }
 
+void getS(int* labels, int* S, int labels_size, int image_size)
+{
+  for(int i = 0; i < image_size; i++)
+  {
+    if(labels[i] != 0)
+    {
+      S[labels[i]] += 1;
+    }
+  }
+}
+
+void getP(int* labels, int* P, int labels_size, int width, int height)
+{
+  int value = 0;
+  int flag = 0;
+
+  for(int y = 0; y < height; y++)
+  {
+    for(int x = 0; x < width; x++)
+    {
+      value = labels[y*width + x];
+      flag = 0;
+      if(value != 0)
+      {
+        for(int fy = y-1; fy < y+1; fy++)
+        {
+          for(int fx = x-1; fx < x+1; fx++)
+          {
+            if(labels[fy*width + fx] != value)
+            {
+              flag = 1;
+            }
+          }
+        }
+        if(flag == 1)
+        {
+          P[value] += 1;
+        }
+      }
+    }
+  }
+}
+
+void getC(int* P, int* S, int* C, int size)
+{
+  for(int i = 1; i < size + 1; i++)
+  {
+    C[i] = int(P[i]*P[i]/S[i]);
+  }
+}
+
+void getCenterOfMass(int* labels, int width, int height, int contour_index, int& x_mass_center, int& y_mass_center)
+{
+  int value = 0;
+  int sum_x = 0;
+  int sum_y = 0;
+  int S = 0;
+
+  for(int y = 0; y < height; y++)
+  {
+    for(int x = 0; x < width; x++)
+    {
+      value = labels[y*width + x];
+      if(value == contour_index)
+      {
+        sum_x += x;
+        sum_y += y;
+        S += 1;
+      }
+    }
+  }
+
+  x_mass_center = int(sum_x/S);
+  y_mass_center = int(sum_y/S);
+}
+
+double getDiscreteCentralMoment(int* labels, int width, int height, int contour_index, int i, int j)
+{
+  int x_mass_center = 0;
+  int y_mass_center = 0;
+  int value = 0;
+  double result = 0;
+
+  getCenterOfMass(labels, width, height, contour_index, x_mass_center, y_mass_center);
+  //cout << x_mass_center << " " << y_mass_center << endl;
+
+  for(int y = 0; y < height; y++)
+  {
+    for(int x = 0; x < width; x++)
+    {
+      value = labels[y*width + x];
+      result += pow(x - x_mass_center, i)*pow(y - y_mass_center, j);
+    }
+  }
+
+  return result;
+}
+
+int getElongation(int* labels, int width, int height, int contour_index)
+{
+  double m20 = getDiscreteCentralMoment(labels, width, height, contour_index, 2, 0);
+  double m02 = getDiscreteCentralMoment(labels, width, height, contour_index, 0, 2);
+  double m11 = getDiscreteCentralMoment(labels, width, height, contour_index, 1, 1);
+
+  double result = m20+m02+sqrt(pow(m20-m02,2)+4*pow(m11,2));
+  result /= m20+m02-sqrt(pow(m20-m02,2)+4*pow(m11,2));
+
+  return int(result);
+}
+
+void getE(int* labels, int* E, int labels_size, int width, int height)
+{
+  for(int i = 1; i < labels_size + 1; i++)
+  {
+    E[i] = getElongation(labels, width, height, i);
+  }
+}
+
 int main(int argc, char** argv)
 {
   if(argc != 2)
@@ -420,12 +538,6 @@ int main(int argc, char** argv)
     1,1,0,0,0
   };
 
-  // int erosion_mask[9] = {
-  //   1,1,1,
-  //   1,1,1,
-  //   1,1,1
-  // };
-
   image = morphologyErosion(image, erosion_mask, 5);
   image = medianFilter(image, 3, 3);
   image = morphologyDilation(image, dilation_mask, 5);
@@ -449,6 +561,42 @@ int main(int argc, char** argv)
   normalizeLabels(labels, contours, width*height, contour_num);
 
   image = colorizeContours(image, labels);
+
+  int* S = (int*)calloc(contour_num + 1,sizeof(int));
+  getS(labels, S, contour_num, width*height);
+
+  int* P = (int*)calloc(contour_num + 1,sizeof(int));
+  getP(labels, P, contour_num, width, height);
+
+  int* C = (int*)calloc(contour_num + 1,sizeof(int));
+  getC(P, S, C, contour_num);
+
+  int* E = (int*)calloc(contour_num + 1,sizeof(int));
+  getE(labels, E, contour_num, width, height);
+
+  for(int i = 0; i < contour_num + 1; i++)
+  {
+    cout << S[i] << " ";
+  }
+  cout << endl;
+
+  for(int i = 0; i < contour_num + 1; i++)
+  {
+    cout << P[i] << " ";
+  }
+  cout << endl;
+
+  for(int i = 0; i < contour_num + 1; i++)
+  {
+    cout << C[i] << " ";
+  }
+  cout << endl;
+
+  for(int i = 0; i < contour_num + 1; i++)
+  {
+    cout << E[i] << " ";
+  }
+  cout << endl;
 
   imwrite(new_image_path, image);
   namedWindow("Display window", WINDOW_AUTOSIZE);// Create a window for display.
