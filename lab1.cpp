@@ -1,6 +1,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <iostream>
+#include <iterator>
 #include <cmath>
 #include <set>
 
@@ -339,6 +340,8 @@ Mat colorizeContours(Mat image, int* labels)
   Mat image_colorized = Mat(width,height, CV_8UC3, Scalar(0,0,0));
   int i = 0;
 
+
+
   for(int y = 0; y < height; y++)
   {
     for(int x = 0; x < width; x++)
@@ -346,9 +349,9 @@ Mat colorizeContours(Mat image, int* labels)
       if(labels[i] != 0)
       {
         Vec3b color = image_colorized.at<Vec3b>(Point(y,x));
-        color[0] = 30*labels[i];
-        color[1] = 7*labels[i];
-        color[2] = 13*labels[i];
+        color[0] = 10*labels[i];
+        color[1] = 30*labels[i];
+        color[2] = 20*labels[i];
         image_colorized.at<Vec3b>(Point(y,x)) = color;
       }
       i++;
@@ -356,6 +359,19 @@ Mat colorizeContours(Mat image, int* labels)
   }
 
   return image_colorized;
+}
+
+void normalizeLabels(int* labels, int* contours, int labels_size, int contours_size)
+{
+  for(int i = 0; i < labels_size; i++)
+  {
+    int value = labels[i];
+    if(value != 0)
+    {
+      int index = std::distance(contours, std::find(contours, contours + contours_size, value));
+      labels[i] = index;
+    }
+  }
 }
 
 int main(int argc, char** argv)
@@ -406,7 +422,18 @@ int main(int argc, char** argv)
   std::set<int> slabels(labels, labels + width*height);
   int contour_num = slabels.size() - 1;
   cout << "Contours number: " << contour_num << endl;
-  
+
+  int contours[contour_num];
+  int i = 0;
+  for(set<int>::iterator elementIt = slabels.begin(); elementIt != slabels.end(); elementIt++)
+  {
+    int x = *elementIt;
+    if(x != 0)
+      contours[i++] = x;
+  }
+
+  normalizeLabels(labels, contours, width*height, contour_num);
+
   image = colorizeContours(image, labels);
 
   imwrite(new_image_path, image);
