@@ -208,7 +208,7 @@ Mat morphologyErosion(Mat image, int* mask, int mask_size)
 {
   int width = image.rows;
   int height = image.cols;
-  Mat image_erosion = image.clone();
+  Mat image_erosion = Mat(width,height, CV_8UC3, Scalar(0));
 
   for(int y = mask_size/2; y < height; y++)
   {
@@ -244,6 +244,10 @@ Mat morphologyErosion(Mat image, int* mask, int mask_size)
             }
           }
         }
+        else
+        {
+          image_erosion.at<uchar>(x, y) = image.at<uchar>(x, y);
+        }
       }
     }
   }
@@ -255,7 +259,7 @@ Mat morphologyDilation(Mat image, int* mask, int mask_size)
 {
   int width = image.rows;
   int height = image.cols;
-  Mat image_dilation = image.clone();
+  Mat image_dilation = Mat(width,height, CV_8UC3, Scalar(0));
 
   for(int y = mask_size/2; y < height; y++)
   {
@@ -290,6 +294,10 @@ Mat morphologyDilation(Mat image, int* mask, int mask_size)
               }
             }
           }
+        }
+        else
+        {
+          image_dilation.at<uchar>(x, y) = image.at<uchar>(x, y);
         }
       }
     }
@@ -340,8 +348,6 @@ Mat colorizeContours(Mat image, int* labels)
   Mat image_colorized = Mat(width,height, CV_8UC3, Scalar(0,0,0));
   int i = 0;
 
-
-
   for(int y = 0; y < height; y++)
   {
     for(int x = 0; x < width; x++)
@@ -349,9 +355,9 @@ Mat colorizeContours(Mat image, int* labels)
       if(labels[i] != 0)
       {
         Vec3b color = image_colorized.at<Vec3b>(Point(y,x));
-        color[0] = 10*labels[i];
+        color[0] = 50*labels[i];
         color[1] = 30*labels[i];
-        color[2] = 20*labels[i];
+        color[2] = 40*labels[i];
         image_colorized.at<Vec3b>(Point(y,x)) = color;
       }
       i++;
@@ -395,24 +401,32 @@ int main(int argc, char** argv)
 
   image = medianFilter(image, 3, 3);
   //image = adaptiveBinarization(image);
-  int thresholds[5] = {215,215,210,200,190};
+  int thresholds[5] = {215,235,210,200,190};
   image = Binarization(image, thresholds[atoi(argv[1]) - 1]);
 
   int dilation_mask[25] = {
-    0,1,1,1,0,
     1,1,1,1,1,
     1,1,1,1,1,
     1,1,1,1,1,
-    0,1,1,1,0
+    1,1,1,1,1,
+    1,1,1,1,1
   };
 
-  int erosion_mask[9] = {
-    1,1,1,
-    0,1,0,
-    0,1,0
+  int erosion_mask[25] = {
+    0,0,0,0,0,
+    0,0,0,0,0,
+    0,0,1,0,0,
+    1,1,0,0,0,
+    1,1,0,0,0
   };
 
-  image = morphologyErosion(image, erosion_mask, 3);
+  // int erosion_mask[9] = {
+  //   1,1,1,
+  //   1,1,1,
+  //   1,1,1
+  // };
+
+  image = morphologyErosion(image, erosion_mask, 5);
   image = medianFilter(image, 3, 3);
   image = morphologyDilation(image, dilation_mask, 5);
 
@@ -420,7 +434,7 @@ int main(int argc, char** argv)
   recursiveLabeling(image, labels);
 
   std::set<int> slabels(labels, labels + width*height);
-  int contour_num = slabels.size() - 1;
+  int contour_num = slabels.size() - 2;
   cout << "Contours number: " << contour_num << endl;
 
   int contours[contour_num];
