@@ -296,6 +296,67 @@ Mat morphologyDilation(Mat image, int* mask, int mask_size)
   return image_dilation;
 }
 
+void fillArea(Mat image, int* labels, int x, int y, int contour)
+{
+  int width = image.rows;
+  int height = image.cols;
+  Scalar pixel = image.at<uchar>(x, y);
+
+  if(labels[y*width + x] == 0 && pixel.val[0] == 255)
+  {
+    labels[y*width + x] = contour;
+    if(x > 0)
+      fillArea(image, labels, x-1, y, contour);
+    if(x < width-1)
+      fillArea(image, labels, x+1, y, contour);
+    if(y > 0)
+      fillArea(image, labels, x, y-1, contour);
+    if(y < height-1)
+      fillArea(image, labels, x, y+1, contour);
+  }
+}
+
+void recursiveLabeling(Mat image, int* labels)
+{
+  int contour = 1;
+  int width = image.rows;
+  int height = image.cols;
+
+  for(int y = 0; y < height; y++)
+  {
+    for(int x = 0; x < width; x++)
+    {
+      fillArea(image, labels, x, y, contour++);
+    }
+  }
+}
+
+Mat colorizeContours(Mat image, int* labels)
+{
+  int width = image.rows;
+  int height = image.cols;
+  Mat image_colorized = Mat(width,height, CV_8UC3, Scalar(0,0,0));
+  int i = 0;
+
+  for(int y = 0; y < height; y++)
+  {
+    for(int x = 0; x < width; x++)
+    {
+      if(labels[i] != 0)
+      {
+        Vec3b color = image_colorized.at<Vec3b>(Point(y,x));
+        color[0] = 30*labels[i];
+        color[1] = 7*labels[i];
+        color[2] = 13*labels[i];
+        image_colorized.at<Vec3b>(Point(y,x)) = color;
+      }
+      i++;
+    }
+  }
+
+  return image_colorized;
+}
+
 int main(int argc, char** argv)
 {
   if(argc != 2)
@@ -337,8 +398,10 @@ int main(int argc, char** argv)
   image = morphologyErosion(image, erosion_mask, 3);
   image = medianFilter(image, 3, 3);
   image = morphologyDilation(image, dilation_mask, 5);
-  //image = morphologyDilation(image, dilation_mask, 5);
-  //image = morphologyDilation(image, dilation_mask, 5);
+
+  int* labels = (int*)calloc(width*height,sizeof(int));
+  recursiveLabeling(image, labels);
+  image = colorizeContours(image, labels);
 
   imwrite(new_image_path, image);
   namedWindow("Display window", WINDOW_AUTOSIZE);// Create a window for display.
