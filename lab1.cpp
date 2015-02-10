@@ -478,7 +478,7 @@ double getDiscreteCentralMoment(int* labels, int width, int height, int contour_
   return result;
 }
 
-int getElongation(int* labels, int width, int height, int contour_index)
+double getElongation(int* labels, int width, int height, int contour_index)
 {
   double m20 = getDiscreteCentralMoment(labels, width, height, contour_index, 2, 0);
   double m02 = getDiscreteCentralMoment(labels, width, height, contour_index, 0, 2);
@@ -487,10 +487,10 @@ int getElongation(int* labels, int width, int height, int contour_index)
   double result = m20+m02+sqrt(pow(m20-m02,2)+4*pow(m11,2));
   result /= m20+m02-sqrt(pow(m20-m02,2)+4*pow(m11,2));
 
-  return int(result);
+  return result;
 }
 
-void getE(int* labels, int* E, int labels_size, int width, int height)
+void getE(int* labels, double* E, int labels_size, int width, int height)
 {
   for(int i = 1; i < labels_size + 1; i++)
   {
@@ -513,7 +513,7 @@ int main(int argc, char** argv)
   image_path = string("img/") + argv[1] + ".jpg";
   new_image_path = string("img/") + argv[1] + "_new.jpg";
 
-  image = imread(image_path, CV_LOAD_IMAGE_GRAYSCALE);   // Read the file
+  image = imread(image_path, CV_LOAD_IMAGE_GRAYSCALE);
   int width = image.rows;
   int height = image.cols;
 
@@ -571,7 +571,7 @@ int main(int argc, char** argv)
   int* C = (int*)calloc(contour_num + 1,sizeof(int));
   getC(P, S, C, contour_num);
 
-  int* E = (int*)calloc(contour_num + 1,sizeof(int));
+  double* E = (double*)calloc(contour_num + 1,sizeof(double));
   getE(labels, E, contour_num, width, height);
 
   for(int i = 0; i < contour_num + 1; i++)
@@ -599,9 +599,9 @@ int main(int argc, char** argv)
   cout << endl;
 
   imwrite(new_image_path, image);
-  namedWindow("Display window", WINDOW_AUTOSIZE);// Create a window for display.
-  imshow("Display window", image);                   // Show our image inside it.
+  namedWindow("Display window", WINDOW_AUTOSIZE);
+  imshow("Display window", image);
 
-  waitKey(0);                                          // Wait for a keystroke in the window
+  waitKey(0);
   return 0;
 }
