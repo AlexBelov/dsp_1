@@ -18,6 +18,15 @@ int compareInts(const void* a, const void* b)
   return 0;
 }
 
+int compareDoubles(const void* a, const void* b)
+{
+  int arg1 = *reinterpret_cast<const double*>(a);
+  int arg2 = *reinterpret_cast<const double*>(b);
+  if(arg1 < arg2) return -1;
+  if(arg1 > arg2) return 1;
+  return 0;
+}
+
 Mat medianFilter(Mat image, int window_width, int window_height)
 {
   Mat image_new = image.clone();
@@ -664,11 +673,23 @@ Mat colorizeClusters(Mat image, int* labels, int* clusters, int** colors)
   return image_colorized;
 }
 
+bool inArray(int* array, int size, int num)
+{
+  for(int i = 0; i < size; i++)
+  {
+    if(array[i] == num)
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
 int main(int argc, char** argv)
 {
-  if(argc != 3)
+  if(argc != 2)
   {
-    cout <<" Usage: ./lab1 image_number num_clusters" << endl;
+    cout <<" Usage: ./lab1 image_number" << endl;
     return -1;
   }
 
@@ -752,7 +773,7 @@ int main(int argc, char** argv)
     features[i][3] = E[i];
   }
 
-  int num_clusters = atoi(argv[2]);
+  int num_clusters = 2;
   int* feature_clusters = (int*)calloc(contour_num + 1, sizeof(int));
 
   kMeans(features, feature_clusters, num_clusters, features_num, contour_num);
@@ -781,14 +802,84 @@ int main(int argc, char** argv)
   }
   cout << endl;
 
-  int** colors = (int**)calloc(num_clusters, sizeof(int*));
-  for(int i = 0; i < num_clusters; i++)
+  int** colors = (int**)calloc(num_clusters + 1, sizeof(int*));
+  for(int i = 0; i < num_clusters + 1; i++)
   {
     colors[i] = (int*)calloc(3, sizeof(int));
     colors[i][0] = rand() % 255;
     colors[i][1] = rand() % 255;
     colors[i][2] = rand() % 255;
   }
+
+  int* feature_uniq = (int*)calloc(contour_num + 1, sizeof(int));
+  int uniq_features_num = 0;
+
+  for(int i = 1; i < contour_num + 1; i++)
+  {
+    if(!inArray(feature_uniq, contour_num + 1, feature_clusters[i]))
+    {
+      feature_uniq[uniq_features_num++] = feature_clusters[i];
+    }
+  }
+
+  double* median_features = (double*)calloc(contour_num + 1, sizeof(double));
+  int num_features_median = 0;
+  double median_value = 0;
+  int feature_for_filter_num = 1;
+  int feature_filter = 1;
+  double up_threshold = 1.1;
+
+  for(int feature_filter = 0; feature_filter < feature_for_filter_num; feature_filter++)
+  {
+    for(int i = 0; i < uniq_features_num + 1; i++)
+    {
+      num_features_median = 0;
+      for(int j = 1; j < contour_num + 1; j++)
+      {
+        if(feature_clusters[j] == feature_uniq[i])
+        {
+          median_features[num_features_median++] = features[j][feature_filter];
+        }
+      }
+      qsort(median_features, num_features_median, sizeof(double), compareDoubles);
+      median_value = median_features[num_features_median/2];
+
+      // for(int i = 1; i < contour_num + 1; i++)
+      // {
+      //   cout << feature_clusters[i] << " ";
+      // }
+      // cout << endl;
+      //cout << median_value << endl;
+      for(int j = 1; j < contour_num + 1; j++)
+      {
+        if(feature_clusters[j] == feature_uniq[i])
+        {
+          if(features[j][feature_filter] > median_value*up_threshold || features[j][feature_filter] < median_value*0.7)
+          {
+            feature_clusters[j] = uniq_features_num + 1;
+          }
+        }
+      }
+    }
+  }
+
+  cout << "Features vector" << endl;
+  cout << "  S   P     C       E" << endl;
+  for(int i = 1; i < contour_num + 1; i++)
+  {
+    cout << setw(4);
+    cout << features[i][0] << " ";
+    cout << setw(3);
+    cout << features[i][1] << " ";
+    cout << setw(7);
+    cout << features[i][2] << " ";
+    cout << setw(7);
+    cout << features[i][3] << " ";
+    cout << setw(7);
+    cout << "Cluster: " << feature_clusters[i];
+    cout << endl;
+  }
+  cout << endl;
 
   image = colorizeClusters(image, labels, feature_clusters, colors);
 
