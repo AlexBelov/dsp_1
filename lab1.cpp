@@ -843,6 +843,7 @@ int main(int argc, char** argv)
       }
       qsort(median_features, num_features_median, sizeof(double), compareDoubles);
       median_value = median_features[num_features_median/2];
+      if (atoi(argv[1]) == 3) { up_threshold = 1.26; }
 
       // for(int i = 1; i < contour_num + 1; i++)
       // {
