@@ -2,6 +2,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <iostream>
 #include <iterator>
+#include <iomanip>
 #include <cmath>
 #include <set>
 
@@ -423,11 +424,11 @@ void getP(int* labels, int* P, int labels_size, int width, int height)
   }
 }
 
-void getC(int* P, int* S, int* C, int size)
+void getC(int* P, int* S, double* C, int size)
 {
   for(int i = 1; i < size + 1; i++)
   {
-    C[i] = int(P[i]*P[i]/S[i]);
+    C[i] = double(P[i]*P[i]/double(S[i]));
   }
 }
 
@@ -498,11 +499,176 @@ void getE(int* labels, double* E, int labels_size, int width, int height)
   }
 }
 
+double getDistanceToCenter(double* feature, double* cluster_center, int num_features)
+{
+  double result = 0;
+  for(int i = 0; i < num_features; i++)
+  {
+    result += pow(feature[i] - cluster_center[i], 2);
+  }
+  result = sqrt(result);
+  //cout << "Distance: " << result << endl;
+  return result;
+}
+
+int getFeaturesClusters(double** features, double** cluster_centers, int* feature_clusters, int contour_num, int features_num, int num_clusters)
+{
+  double min_distance = 0;
+  int nearest_cluster = 0;
+  double distance = 0;
+  int changed = 0;
+
+  for(int i = 1; i < contour_num + 1; i++)
+  {
+    min_distance = getDistanceToCenter(features[i], cluster_centers[0], features_num);
+    nearest_cluster = 0;
+
+    for(int j = 0; j < num_clusters; j++)
+    {
+      distance = getDistanceToCenter(features[i], cluster_centers[j], features_num);
+      if(distance < min_distance)
+      {
+        min_distance = distance;
+        nearest_cluster = j;
+      }
+    }
+
+    if(feature_clusters[i] != nearest_cluster)
+    {
+      changed = 1;
+    }
+    feature_clusters[i] = nearest_cluster;
+  }
+
+  return changed;
+}
+
+void alignClusterCenters(double** features, double** cluster_centers, int* feature_clusters, int contour_num, int num_features, int num_clusters)
+{
+  int nearest_cluster = 0;
+  double* new_center = (double*)calloc(num_features, sizeof(double));
+  int num_contours_in_cluster = 0;
+
+  for(int i = 0; i < num_clusters; i++)
+  {
+    for(int k = 0; k < num_features; k++)
+    {
+      new_center[k] = 0;
+    }
+
+    num_contours_in_cluster = 0;
+
+    for(int j = 1; j < contour_num + 1; j++)
+    {
+      nearest_cluster = feature_clusters[j];
+      if (nearest_cluster == i)
+      {
+        for(int k = 0; k < num_features; k++)
+        {
+          new_center[k] += features[j][k];
+        }
+
+        num_contours_in_cluster++;
+      }
+    }
+
+    for(int k = 0; k < num_features; k++)
+    {
+      new_center[k] /= num_contours_in_cluster;
+      cluster_centers[i][k] = new_center[k];
+    }
+  }
+}
+
+void kMeans(double** features, int* feature_clusters, int num_clusters, int features_num, int contour_num)
+{
+  double** cluster_centers = (double**)calloc(num_clusters, sizeof(double*));
+  for(int i = 0; i < num_clusters; i++)
+  {
+    cluster_centers[i] = (double*)calloc(features_num, sizeof(double));
+  }
+
+  cluster_centers[0][0] = 1000;
+  cluster_centers[0][1] = 70;
+  cluster_centers[0][2] = 6;
+  cluster_centers[0][3] = 2.7;
+
+  cluster_centers[1][0] = 4300;
+  cluster_centers[1][1] = 300;
+  cluster_centers[1][2] = 20;
+  cluster_centers[1][3] = 2.1;
+
+  if(num_clusters - 2 > 0)
+  {
+    for(int i = 2; i < num_clusters; i++)
+    {
+      cluster_centers[i][0] = rand() % 6000 + 100;
+      cluster_centers[i][1] = rand() % 400 + 50;
+      cluster_centers[i][2] = rand() % 30 + 3;
+      cluster_centers[i][3] = rand() % 5;
+    }
+  }
+
+  // cout << "Cluster centers:" << endl;
+  // for(int i = 0; i < num_clusters; i++)
+  // {
+  //   cout << cluster_centers[i][0] << " ";
+  //   cout << cluster_centers[i][1] << " ";
+  //   cout << cluster_centers[i][2] << " ";
+  //   cout << cluster_centers[i][3] << " " << endl;
+  // }
+
+  int changed = 1;
+
+  while(changed == 1)
+  {
+    changed = getFeaturesClusters(features, cluster_centers, feature_clusters, contour_num, features_num, num_clusters);
+    if(changed == 0)
+    {
+      break;
+    }
+    alignClusterCenters(features, cluster_centers, feature_clusters, contour_num, features_num, num_clusters);
+  }
+
+  // for(int i = 0; i < num_clusters; i++)
+  // {
+  //   free(cluster_centers[i]);
+  // }
+  // free(cluster_centers);
+}
+
+Mat colorizeClusters(Mat image, int* labels, int* clusters, int** colors)
+{
+  int width = image.rows;
+  int height = image.cols;
+  Mat image_colorized = Mat(width,height, CV_8UC3, Scalar(0,0,0));
+  int i = 0;
+
+  for(int y = 0; y < height; y++)
+  {
+    for(int x = 0; x < width; x++)
+    {
+      if(labels[i] != 0)
+      {
+        Vec3b color = image_colorized.at<Vec3b>(Point(y,x));
+        color[0] = colors[clusters[labels[i]]][0];
+        color[1] = colors[clusters[labels[i]]][1];
+        color[2] = colors[clusters[labels[i]]][2];
+        //cout << labels[i] << " " << clusters[labels[i]-1] << endl;
+        image_colorized.at<Vec3b>(Point(y,x)) = color;
+      }
+      i++;
+    }
+  }
+
+  return image_colorized;
+}
+
 int main(int argc, char** argv)
 {
-  if(argc != 2)
+  if(argc != 3)
   {
-    cout <<" Usage: ./lab1 image_number" << endl;
+    cout <<" Usage: ./lab1 image_number num_clusters" << endl;
     return -1;
   }
 
@@ -519,7 +685,7 @@ int main(int argc, char** argv)
 
   image = medianFilter(image, 3, 3);
   //image = adaptiveBinarization(image);
-  int thresholds[5] = {215,235,210,200,190};
+  int thresholds[5] = {215,235,220,160,190};
   image = Binarization(image, thresholds[atoi(argv[1]) - 1]);
 
   int dilation_mask[25] = {
@@ -568,40 +734,70 @@ int main(int argc, char** argv)
   int* P = (int*)calloc(contour_num + 1,sizeof(int));
   getP(labels, P, contour_num, width, height);
 
-  int* C = (int*)calloc(contour_num + 1,sizeof(int));
+  double* C = (double*)calloc(contour_num + 1,sizeof(double));
   getC(P, S, C, contour_num);
 
   double* E = (double*)calloc(contour_num + 1,sizeof(double));
   getE(labels, E, contour_num, width, height);
 
-  for(int i = 0; i < contour_num + 1; i++)
-  {
-    cout << S[i] << " ";
-  }
-  cout << endl;
+  double** features = (double**)calloc(contour_num + 1, sizeof(double*));
+  int features_num = 4;
 
   for(int i = 0; i < contour_num + 1; i++)
   {
-    cout << P[i] << " ";
+    features[i] = (double*)calloc(features_num, sizeof(double));
+    features[i][0] = S[i];
+    features[i][1] = P[i];
+    features[i][2] = C[i];
+    features[i][3] = E[i];
+  }
+
+  int num_clusters = atoi(argv[2]);
+  int* feature_clusters = (int*)calloc(contour_num + 1, sizeof(int));
+
+  kMeans(features, feature_clusters, num_clusters, features_num, contour_num);
+
+  // for(int i = 1; i < contour_num + 1; i++)
+  // {
+  //   cout << feature_clusters[i] << " ";
+  // }
+  // cout << endl;
+
+  cout << "Features vector" << endl;
+  cout << "  S   P     C       E" << endl;
+  for(int i = 1; i < contour_num + 1; i++)
+  {
+    cout << setw(4);
+    cout << features[i][0] << " ";
+    cout << setw(3);
+    cout << features[i][1] << " ";
+    cout << setw(7);
+    cout << features[i][2] << " ";
+    cout << setw(7);
+    cout << features[i][3] << " ";
+    cout << setw(7);
+    cout << "Cluster: " << feature_clusters[i];
+    cout << endl;
   }
   cout << endl;
 
-  for(int i = 0; i < contour_num + 1; i++)
+  int** colors = (int**)calloc(num_clusters, sizeof(int*));
+  for(int i = 0; i < num_clusters; i++)
   {
-    cout << C[i] << " ";
+    colors[i] = (int*)calloc(3, sizeof(int));
+    colors[i][0] = rand() % 255;
+    colors[i][1] = rand() % 255;
+    colors[i][2] = rand() % 255;
   }
-  cout << endl;
 
-  for(int i = 0; i < contour_num + 1; i++)
-  {
-    cout << E[i] << " ";
-  }
-  cout << endl;
+  image = colorizeClusters(image, labels, feature_clusters, colors);
 
   imwrite(new_image_path, image);
   namedWindow("Display window", WINDOW_AUTOSIZE);
   imshow("Display window", image);
 
   waitKey(0);
+
+  //free(feature_clusters);
   return 0;
 }
