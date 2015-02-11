@@ -377,7 +377,7 @@ Mat colorizeContours(Mat image, int* labels)
   return image_colorized;
 }
 
-void normalizeLabels(int* labels, int* contours, int labels_size, int contours_size)
+void normalizeLabels(int* labels, int* contours, int labels_size, int contours_size, char* pic)
 {
   for(int i = 0; i < labels_size; i++)
   {
@@ -386,6 +386,7 @@ void normalizeLabels(int* labels, int* contours, int labels_size, int contours_s
     {
       int index = std::distance(contours, std::find(contours, contours + contours_size, value));
       labels[i] = index + 1;
+      if(*pic == '3' || *pic == '4') { labels[i]--; }
     }
   }
 }
@@ -731,7 +732,7 @@ int main(int argc, char** argv)
     0,0,0,0,0
   };
 
-  if(*argv[1] == '2')
+  if(*argv[1] == '2' || *argv[1] == '4')
   {
     image = morphologyErosion(image, erosion_mask_2, 5);
   }
@@ -747,7 +748,18 @@ int main(int argc, char** argv)
   recursiveLabeling(image, labels);
 
   std::set<int> slabels(labels, labels + width*height);
-  int contour_num = slabels.size() - 1;
+
+  int contour_num = 0;
+
+  if(*argv[1] == '3' || *argv[1] == '4')
+  {
+    contour_num = slabels.size() - 2;
+  }
+  else
+  {
+    contour_num = slabels.size() - 1;
+  }
+
   cout << "Contours number: " << contour_num << endl;
 
   int contours[contour_num];
@@ -759,7 +771,7 @@ int main(int argc, char** argv)
       contours[i++] = x;
   }
 
-  normalizeLabels(labels, contours, width*height, contour_num);
+  normalizeLabels(labels, contours, width*height, contour_num, argv[1]);
   // image = colorizeContours(image, labels);
   // imwrite("img/col.jpg", image);
 
@@ -860,8 +872,8 @@ int main(int argc, char** argv)
       qsort(median_features, num_features_median, sizeof(double), compareDoubles);
       median_value = median_features[num_features_median/2];
 
-      if (atoi(argv[1]) == 3) { up_threshold = 1.26; }
-      if (atoi(argv[1]) == 7) { up_threshold = 1.7; }
+      if (*argv[1] == '3') { up_threshold = 1.26; }
+      if (*argv[1] == '7') { up_threshold = 1.7; }
 
       // for(int i = 1; i < contour_num + 1; i++)
       // {
