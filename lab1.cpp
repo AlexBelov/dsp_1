@@ -385,7 +385,7 @@ void normalizeLabels(int* labels, int* contours, int labels_size, int contours_s
     if(value != 0)
     {
       int index = std::distance(contours, std::find(contours, contours + contours_size, value));
-      labels[i] = index;
+      labels[i] = index + 1;
     }
   }
 }
@@ -706,7 +706,7 @@ int main(int argc, char** argv)
 
   image = medianFilter(image, 3, 3);
   //image = adaptiveBinarization(image);
-  int thresholds[5] = {215,235,220,160,190};
+  int thresholds[10] = {215,235,220,160,200,200,200,200,200,212};
   image = Binarization(image, thresholds[atoi(argv[1]) - 1]);
 
   int dilation_mask[25] = {
@@ -717,15 +717,29 @@ int main(int argc, char** argv)
     1,1,1,1,1
   };
 
-  int erosion_mask[25] = {
-    0,0,0,0,0,
-    0,0,0,0,0,
-    0,0,1,0,0,
-    1,1,0,0,0,
-    1,1,0,0,0
+  int erosion_mask_1[9] = {
+    1,1,1,
+    1,1,1,
+    1,1,1
   };
 
-  image = morphologyErosion(image, erosion_mask, 5);
+  int erosion_mask_2[25] = {
+    0,0,0,0,0,
+    0,0,1,0,0,
+    0,0,1,0,0,
+    0,0,1,0,0,
+    0,0,0,0,0
+  };
+
+  if(*argv[1] == '2')
+  {
+    image = morphologyErosion(image, erosion_mask_2, 5);
+  }
+  else
+  {
+    image = morphologyErosion(image, erosion_mask_1, 3);
+  }
+
   image = medianFilter(image, 3, 3);
   image = morphologyDilation(image, dilation_mask, 5);
 
@@ -733,7 +747,7 @@ int main(int argc, char** argv)
   recursiveLabeling(image, labels);
 
   std::set<int> slabels(labels, labels + width*height);
-  int contour_num = slabels.size() - 2;
+  int contour_num = slabels.size() - 1;
   cout << "Contours number: " << contour_num << endl;
 
   int contours[contour_num];
@@ -746,8 +760,10 @@ int main(int argc, char** argv)
   }
 
   normalizeLabels(labels, contours, width*height, contour_num);
+  // image = colorizeContours(image, labels);
+  // imwrite("img/col.jpg", image);
 
-  image = colorizeContours(image, labels);
+  //image = colorizeContours(image, labels);
 
   int* S = (int*)calloc(contour_num + 1,sizeof(int));
   getS(labels, S, contour_num, width*height);
@@ -843,7 +859,9 @@ int main(int argc, char** argv)
       }
       qsort(median_features, num_features_median, sizeof(double), compareDoubles);
       median_value = median_features[num_features_median/2];
+
       if (atoi(argv[1]) == 3) { up_threshold = 1.26; }
+      if (atoi(argv[1]) == 7) { up_threshold = 1.7; }
 
       // for(int i = 1; i < contour_num + 1; i++)
       // {
